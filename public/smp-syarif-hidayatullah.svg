@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 230" role="img" aria-labelledby="title desc">
+  <title id="title">Lambang SMP Syarif Hidayatullah</title>
+  <desc id="desc">Perisai hijau dengan bintang, buku, padi, daun, pita nama sekolah, dan tulisan Sumber Cirebon.</desc>
+  <defs>
+    <path id="school-arc" d="M31 104 Q120 2 209 104" />
+  </defs>
+  <path d="M120 3C160 12 204 37 236 77L219 164C211 196 190 217 165 227H75C49 217 29 196 21 164L4 77C36 37 80 12 120 3Z" fill="#080b09" />
+  <path d="M120 10C158 19 198 42 228 79L211 160C204 188 185 207 162 217H78C55 207 36 188 29 160L12 79C42 42 82 19 120 10Z" fill="#19f384" stroke="#f5f3d9" stroke-width="2" />
+  <text fill="#ffe900" font-family="Georgia,serif" font-size="31" font-weight="700" text-anchor="middle" x="120" y="39">★</text>
+  <text fill="#050807" font-family="Arial,sans-serif" font-size="16" font-weight="800" letter-spacing=".5">
+    <textPath href="#school-arc" startOffset="50%" text-anchor="middle">SEKOLAH MENENGAH PERTAMA</textPath>
+  </text>
+  <g fill="none" stroke="#11150f" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M120 52V94" stroke-width="3" />
+    <path d="M116 76h8M117 88h6" stroke-width="2" />
+  </g>
+  <g fill="none" stroke="#777517" stroke-linecap="round" stroke-width="2">
+    <path d="M57 155C73 129 77 97 70 72" />
+    <path d="M66 138l-17-7m20-1-16-10m18-3-15-12m16-2-13-11m12-1-11-9" />
+    <path d="M66 138l14-12m-12 2 14-13m-12 3 13-14m-12 3 11-14m-12 3 9-13" />
+  </g>
+  <g fill="#9e9c22" stroke="#17200e" stroke-width="1">
+    <path d="M49 131q-15-2-17-15 14 1 20 10m-1 0q-17-5-18-18 15 4 21 13m-2-1q-16-8-13-21 14 6 18 17m-2-2q-14-10-8-22 12 8 15 20m-1-4q-10-12-3-22 10 10 11 23" />
+  </g>
+  <g fill="#229c65" stroke="#176447" stroke-width="1.2">
+    <path d="M177 153c-8-22-9-48-1-74" fill="none" stroke-width="3" />
+    <path d="M176 139q-18 2-22-13 16-2 22 8m-1-5q-17 0-20-15 15-1 21 10m0-5q-14-4-13-19 13 3 17 15m0-4q-10-8-5-21 11 7 13 19m-11 38q17 0 22-14-16-3-23 8m20-15q16-2 17-17-14 1-20 12m16-17q12-8 7-22-12 6-14 18m9-16q7-10-1-21-9 9-7 19" />
+  </g>
+  <g fill="#080a09" stroke="#080a09" stroke-linejoin="round">
+    <path d="M87 91q15-8 32 1v38q-17-9-32-1zm66 0q-15-8-32 1v38q17-9 32-1z" stroke-width="2" />
+    <path d="M120 92v37" fill="none" stroke="#19f384" stroke-width="1.5" />
+    <path d="M92 98q10-4 20 1m-20 5q10-4 20 1m17-5q10-5 20-1m-20 6q10-5 20-1" fill="none" stroke="#19f384" stroke-width="1" />
+    <path d="M85 132h70l-8 7H93z" />
+  </g>
+  <path d="M36 164l-10-7 7 20 13 3-4 10 24-6 12-9h84l12 9 24 6-4-10 13-3 7-20-10 7-15-12H51z" fill="#f8e52d" stroke="#080b09" stroke-width="2.5" stroke-linejoin="round" />
+  <path d="M55 162h130l-8 20H63z" fill="#f8e52d" stroke="#080b09" stroke-width="1" />
+  <text x="120" y="176" text-anchor="middle" fill="#080b09" font-family="Georgia,serif" font-size="11" font-weight="800">SYARIF HIDAYATULLAH</text>
+  <text x="120" y="207" text-anchor="middle" fill="#080b09" font-family="Arial,sans-serif" font-size="13" font-weight="900" letter-spacing=".4">SUMBER - CIREBON</text>
+</svg>
