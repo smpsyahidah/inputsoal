@@ -4,6 +4,28 @@ import type { DemoSession } from "@/lib/ruangsoal";
 const COOKIE_NAME = "ruangsoal-session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
+export type LoginCredentials = {
+  adminUsername: string;
+  adminPassword: string;
+  teacherPassword: string;
+};
+
+export function getLoginCredentials(): LoginCredentials {
+  const isProduction = process.env.NODE_ENV === "production";
+  const adminUsername = process.env.RUANGSOAL_ADMIN_USERNAME ?? (isProduction ? "" : "admin");
+  const adminPassword = process.env.RUANGSOAL_ADMIN_PASSWORD ?? (isProduction ? "" : "admin12345");
+  const teacherPassword = process.env.RUANGSOAL_TEACHER_PASSWORD ?? (isProduction ? "" : "guru12345");
+
+  if (!adminUsername.trim() || adminPassword.length < (isProduction ? 12 : 8) ||
+      teacherPassword.length < (isProduction ? 12 : 8)) {
+    throw new Error(
+      "RUANGSOAL_ADMIN_USERNAME, RUANGSOAL_ADMIN_PASSWORD, dan RUANGSOAL_TEACHER_PASSWORD harus diatur; kata sandi minimal 12 karakter di production.",
+    );
+  }
+
+  return { adminUsername: adminUsername.trim(), adminPassword, teacherPassword };
+}
+
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
   if (!secret || secret.length < 32) {

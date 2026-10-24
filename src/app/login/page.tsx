@@ -5,12 +5,9 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ArrowRight, BookOpenCheck, Eye, EyeOff, GraduationCap, ShieldCheck } from "lucide-react";
 import {
-  ADMIN_USERNAME,
-  ADMIN_PASSWORD,
   SESSION_KEY,
   SCHOOL,
   STORAGE_KEY,
-  TEACHER_PASSWORD,
   type Role,
 } from "@/lib/ruangsoal";
 
@@ -151,11 +148,6 @@ export default function LoginPage() {
             {error && <div className="login-error" role="alert">{error}</div>}
             <button className="login-submit" type="submit">Masuk ke ruang soal <ArrowRight size={17} /></button>
           </form>
-
-          <div className="demo-access">
-            <span className="demo-access-title">AKUN DEMO</span>
-            <p>{role === "admin" ? <><strong>{ADMIN_USERNAME}</strong><span>Kata sandi: {ADMIN_PASSWORD}</span></> : <><strong>nadia</strong><span>Kata sandi guru: {TEACHER_PASSWORD}</span></>}</p>
-          </div>
 
           <div className="login-address"><span>{SCHOOL.name}</span><span>{SCHOOL.address}</span></div>
         </div>

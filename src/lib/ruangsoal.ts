@@ -38,9 +38,6 @@ export const SCHOOL = {
 
 export const STORAGE_KEY = "ruangsoal-v1";
 export const SESSION_KEY = "ruangsoal-session-v1";
-export const ADMIN_USERNAME = "admin";
-export const ADMIN_PASSWORD = "admin12345";
-export const TEACHER_PASSWORD = "guru12345";
 export const GRADE_LEVELS: GradeLevel[] = ["VII", "VIII", "IX"];
 export const DEFAULT_GRADE: GradeLevel = "VII";
 

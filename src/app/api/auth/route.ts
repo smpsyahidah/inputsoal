@@ -1,9 +1,9 @@
 import {
-  ADMIN_PASSWORD,
-  ADMIN_USERNAME,
-  TEACHER_PASSWORD,
-} from "@/lib/ruangsoal";
-import { clearSessionCookie, createSessionCookie, getSession } from "@/lib/auth";
+  clearSessionCookie,
+  createSessionCookie,
+  getLoginCredentials,
+  getSession,
+} from "@/lib/auth";
 import { getStoredData } from "@/lib/database";
 
 export async function GET(request: Request) {
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   } catch (cause) {
     console.error("Gagal memeriksa sesi RuangSoal:", cause);
     return Response.json(
-      { error: "AUTH_SECRET belum siap. Periksa .env.local lalu restart aplikasi." },
+      { error: "Konfigurasi sesi belum siap. Periksa AUTH_SECRET dan kredensial login di environment server." },
       { status: 503 },
     );
   }
@@ -36,13 +36,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    const credentials = getLoginCredentials();
     const username = body.username.trim().toLowerCase();
     let session = null;
     if (body.role === "admin") {
-      if (username === ADMIN_USERNAME && body.password === ADMIN_PASSWORD) {
+      if (username === credentials.adminUsername.toLowerCase() &&
+          body.password === credentials.adminPassword) {
         session = { role: "admin" as const };
       }
-    } else if (body.password === TEACHER_PASSWORD) {
+    } else if (body.password === credentials.teacherPassword) {
       const { teachers } = (await getStoredData()).data;
       const teacher = teachers.find((item) => item.username.toLowerCase() === username);
       if (teacher) session = { role: "guru" as const, teacherId: teacher.id };
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
   } catch (cause) {
     console.error("Gagal membuat sesi RuangSoal:", cause);
     return Response.json(
-      { error: "Login server belum siap. Pastikan PostgreSQL aktif dan AUTH_SECRET sudah diatur." },
+      { error: "Login server belum siap. Pastikan PostgreSQL, AUTH_SECRET, dan kredensial login sudah diatur." },
       { status: 503 },
     );
   }
