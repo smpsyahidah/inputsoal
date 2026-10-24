@@ -21,19 +21,13 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   DEFAULT_GRADE,
   GRADE_LEVELS,
   SCHOOL,
-  SESSION_KEY,
-  STORAGE_KEY,
-  normalizeQuestion,
-  normalizeTeacher,
-  starterQuestions,
-  starterTeachers,
   type DemoSession,
   type GradeLevel,
   type Question,
@@ -137,8 +131,8 @@ export default function Home() {
   const [session, setSession] = useState<DemoSession | null>(null);
   const [activeTeacherId, setActiveTeacherId] = useState("");
   const [activeAssignmentKey, setActiveAssignmentKey] = useState("");
-  const [teachers, setTeachers] = useState(starterTeachers);
-  const [questions, setQuestions] = useState(starterQuestions);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"questions" | "users">("questions");
@@ -146,70 +140,103 @@ export default function Home() {
   const [filterGrade, setFilterGrade] = useState("Semua tingkat");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [newTeacher, setNewTeacher] = useState({ name: "", username: "", assignments: [] as TeachingAssignment[] });
   const [assignmentDraft, setAssignmentDraft] = useState({ subject: "", grade: DEFAULT_GRADE as GradeLevel });
   const [assignmentEditorTeacherId, setAssignmentEditorTeacherId] = useState<string | null>(null);
   const [existingAssignmentDraft, setExistingAssignmentDraft] = useState({ subject: "", grade: DEFAULT_GRADE as GradeLevel });
   const [teacherFormError, setTeacherFormError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"saving" | "saved" | "error">("saved");
   const [ready, setReady] = useState(false);
+  const saveQueue = useRef(Promise.resolve());
+  const revision = useRef(0);
+  const lastSavedSnapshot = useRef("");
 
   useEffect(() => {
-    let storedTeachers = starterTeachers;
-    let storedQuestions = starterQuestions;
-    let storedSession: DemoSession | null = null;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as {
-            questions?: Array<Partial<Question> & { class?: string; className?: string; level?: string; teacher?: string }>;
-            teachers?: Array<Partial<Teacher> & { email?: string; subject?: string }>;
-        };
-        if (parsed.teachers) storedTeachers = parsed.teachers.map(normalizeTeacher);
-        if (parsed.questions) {
-          storedQuestions = parsed.questions.map((question) => normalizeQuestion(question, storedTeachers));
+    let cancelled = false;
+    async function loadWorkspace() {
+      try {
+        const authResponse = await fetch("/api/auth", { cache: "no-store" });
+        if (authResponse.status === 401) {
+          router.replace("/login");
+          return;
         }
-      }
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-    try {
-      const savedSession = localStorage.getItem(SESSION_KEY);
-      if (savedSession) storedSession = JSON.parse(savedSession) as DemoSession;
-    } catch {
-      localStorage.removeItem(SESSION_KEY);
-    }
+        if (!authResponse.ok) {
+          const authError = await authResponse.json().catch(() => null) as { error?: string } | null;
+          throw new Error(authError?.error ?? "Layanan login belum siap. Periksa konfigurasi server.");
+        }
+        const authResult = await authResponse.json() as { session: DemoSession };
+        const dataResponse = await fetch("/api/data", { cache: "no-store" });
+        const dataResult = await dataResponse.json().catch(() => null) as {
+          error?: string;
+          teachers?: Teacher[];
+          questions?: Question[];
+          revision?: number;
+        } | null;
+        if (!dataResponse.ok) throw new Error(dataResult?.error ?? "Data gagal dimuat.");
+        if (!dataResult?.teachers || !dataResult.questions || !dataResult.revision) {
+          throw new Error("Format data dari server tidak valid.");
+        }
+        if (cancelled) return;
 
-    startTransition(() => {
-      setTeachers(storedTeachers);
-      setQuestions(storedQuestions);
-      if (storedSession?.role === "admin") {
-        setSession(storedSession);
-        setRole("admin");
-      } else if (storedSession?.role === "guru") {
-        const teacher = storedTeachers.find((item) => item.id === storedSession?.teacherId);
-        if (teacher) {
-          setSession(storedSession);
-          setRole("guru");
+        revision.current = dataResult.revision;
+        lastSavedSnapshot.current = JSON.stringify({
+          questions: dataResult.questions,
+          teachers: dataResult.teachers,
+        });
+        setSession(authResult.session);
+        setRole(authResult.session.role);
+        setTeachers(dataResult.teachers);
+        setQuestions(dataResult.questions);
+        if (authResult.session.role === "guru") {
+          const teacher = dataResult.teachers.find((item) => item.id === authResult.session.teacherId);
+          if (!teacher) throw new Error("Akun guru tidak lagi tersedia.");
           setActiveTeacherId(teacher.id);
           if (teacher.assignments[0]) setActiveAssignmentKey(getAssignmentKey(teacher.assignments[0]));
         }
+        setReady(true);
+      } catch (cause) {
+        if (!cancelled) {
+          setLoadError(cause instanceof Error ? cause.message : "Data gagal dimuat.");
+        }
       }
-      setReady(true);
-    });
-    const validSession = storedSession?.role === "admin" || (
-      storedSession?.role === "guru" &&
-      storedTeachers.some((teacher) => teacher.id === storedSession?.teacherId)
-    );
-    if (!validSession) {
-      localStorage.removeItem(SESSION_KEY);
-      router.replace("/login");
     }
+    void loadWorkspace();
+    return () => { cancelled = true; };
   }, [router]);
 
   useEffect(() => {
-    if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify({ questions, teachers }));
-  }, [questions, ready, teachers]);
+    if (!ready || !session) return;
+    const snapshot = { questions, teachers };
+    const serializedSnapshot = JSON.stringify(snapshot);
+    if (serializedSnapshot === lastSavedSnapshot.current) return;
+    setSaveStatus("saving");
+    const timer = window.setTimeout(() => {
+      saveQueue.current = saveQueue.current
+        .then(async () => {
+          const response = await fetch("/api/data", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...snapshot, revision: revision.current }),
+          });
+          const result = await response.json() as { error?: string; revision?: number };
+          if (!response.ok) {
+            throw new Error(result.error ?? "Perubahan gagal disimpan.");
+          }
+          if (typeof result.revision !== "number") throw new Error("Versi data dari server tidak valid.");
+          revision.current = result.revision;
+          lastSavedSnapshot.current = serializedSnapshot;
+          setSaveError("");
+          setSaveStatus("saved");
+        })
+        .catch((cause: unknown) => {
+          setSaveError(cause instanceof Error ? cause.message : "Perubahan gagal disimpan.");
+          setSaveStatus("error");
+        });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [questions, ready, session, teachers]);
 
   const activeTeacher = teachers.find((teacher) => teacher.id === activeTeacherId);
   const activeAssignment = activeTeacher?.assignments.find(
@@ -284,8 +311,6 @@ export default function Home() {
     }
     setShowForm(false);
     setEditingId(null);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2600);
   }
 
   async function exportQuestions() {
@@ -399,13 +424,17 @@ export default function Home() {
   }
 
   function logout() {
-    localStorage.removeItem(SESSION_KEY);
-    router.replace("/login");
+    void fetch("/api/auth", { method: "DELETE" })
+      .finally(() => router.replace("/login"));
   }
 
   function removeTeacher(id: string) {
     setTeachers((current) => current.filter((teacher) => teacher.id !== id));
     if (activeTeacherId === id) logout();
+  }
+
+  if (loadError) {
+    return <main className="auth-loading"><span role="alert">Gagal memuat ruang kerja: {loadError}</span><button onClick={() => window.location.reload()}>Muat ulang</button></main>;
   }
 
   if (!ready || !session) {
@@ -449,6 +478,7 @@ export default function Home() {
       </aside>
 
       <section className="workspace" id="dashboard">
+        {saveError && <div className="login-error" role="alert">Perubahan belum tersimpan: {saveError} <button onClick={() => window.location.reload()}>Muat ulang</button></div>}
         <header className="topbar">
           <div className="breadcrumbs"><span>Ruang kerja</span><span className="crumb-divider">/</span><strong>{activeView === "users" ? "Pengguna" : "Bank soal"}</strong></div>
           <div className="topbar-actions">
@@ -528,7 +558,7 @@ export default function Home() {
               <div className="stat-block"><span className="stat-icon stat-icon-sage"><Check size={17} /></span><div><span className="stat-label">Siap diekspor</span><strong>{visibleQuestions.length}</strong></div><span className="stat-note">soal lengkap</span></div>
             </div>
 
-            <div className="section-heading"><div><h2>Daftar soal</h2><p>Kelola, periksa, dan unduh soal dalam format Excel.</p></div><span className="last-saved"><span className="status-dot" /> {saved ? "Perubahan tersimpan" : "Tersimpan otomatis"}</span></div>
+            <div className="section-heading"><div><h2>Daftar soal</h2><p>Kelola, periksa, dan unduh soal dalam format Excel.</p></div><span className="last-saved"><span className="status-dot" /> {saveStatus === "saving" ? "Menyimpan..." : saveStatus === "error" ? "Belum tersimpan" : "Perubahan tersimpan"}</span></div>
 
             <section className="panel question-panel">
               <div className="table-toolbar">

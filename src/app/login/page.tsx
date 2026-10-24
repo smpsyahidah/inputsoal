@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ArrowRight, BookOpenCheck, Eye, EyeOff, GraduationCap, ShieldCheck } from "lucide-react";
@@ -11,11 +11,7 @@ import {
   SCHOOL,
   STORAGE_KEY,
   TEACHER_PASSWORD,
-  normalizeTeacher,
-  starterTeachers,
-  type DemoSession,
   type Role,
-  type Teacher,
 } from "@/lib/ruangsoal";
 
 export default function LoginPage() {
@@ -25,47 +21,67 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [teachers, setTeachers] = useState(starterTeachers);
 
   useEffect(() => {
-    const stored = localStorage.getItem(SESSION_KEY);
-    if (stored) {
-      router.replace("/");
-      return;
-    }
-
-    try {
-      const savedData = localStorage.getItem(STORAGE_KEY);
-      if (savedData) {
-        const parsed = JSON.parse(savedData) as { teachers?: Array<Partial<Teacher> & { email?: string; subject?: string }> };
-        if (parsed.teachers) startTransition(() => setTeachers(parsed.teachers!.map(normalizeTeacher)));
-      }
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    fetch("/api/auth", { cache: "no-store" })
+      .then((response) => {
+        if (response.ok) router.replace("/");
+        else if (response.status !== 401) {
+          return response.json().catch(() => null).then((result: { error?: string } | null) => {
+            setError(result?.error ?? "Layanan login belum siap. Periksa konfigurasi server.");
+          });
+        }
+      })
+      .catch(() => setError("Tidak dapat memeriksa sesi. Periksa koneksi lalu muat ulang halaman."));
   }, [router]);
 
-  function signIn(event: React.FormEvent<HTMLFormElement>) {
+  async function signIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    let session: DemoSession | null = null;
-
-    if (role === "admin") {
-      if (username.trim().toLowerCase() === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        session = { role: "admin" };
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, username, password }),
+      });
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) {
+        setError(result?.error ?? "Tidak dapat masuk. Pastikan PostgreSQL dan konfigurasi server sudah aktif.");
+        return;
       }
-    } else {
-      const teacher = teachers.find((item) => item.username.toLowerCase() === username.trim().toLowerCase());
-      if (teacher && password === TEACHER_PASSWORD) session = { role: "guru", teacherId: teacher.id };
-    }
 
-    if (!session) {
-      setError("Username atau kata sandi tidak sesuai dengan akun demo.");
-      return;
+      if (role === "admin") {
+        const legacy = localStorage.getItem(STORAGE_KEY);
+        if (legacy) {
+          const parsed = JSON.parse(legacy) as {
+            questions?: unknown[];
+            teachers?: unknown[];
+          };
+          if (!Array.isArray(parsed.questions) || !Array.isArray(parsed.teachers)) {
+            throw new Error("Format data lama tidak valid. Data lama tetap tersimpan di browser ini.");
+          }
+          const migration = await fetch("/api/data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...parsed, migration: true }),
+          });
+          if (!migration.ok) {
+            const migrationResult = await migration.json().catch(() => null) as { error?: string } | null;
+            throw new Error(migrationResult?.error ?? "Data lama gagal dipindahkan.");
+          }
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+      localStorage.removeItem(SESSION_KEY);
+      router.replace("/");
+    } catch (cause) {
+      await fetch("/api/auth", { method: "DELETE" }).catch((cleanupError: unknown) => {
+        console.error("Gagal membersihkan sesi login yang tidak lengkap:", cleanupError);
+      });
+      setError(cause instanceof Error
+        ? `Login atau migrasi data gagal: ${cause.message}`
+        : "Login atau migrasi data gagal. Periksa koneksi lalu coba lagi.");
     }
-
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    router.replace("/");
   }
 
   return (
