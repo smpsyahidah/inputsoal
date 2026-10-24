@@ -51,6 +51,12 @@ function ensureSchema(sql: Sql) {
       ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1
     `;
     await sql`
+      CREATE TABLE IF NOT EXISTS ruangsoal_passwords (
+        account_id TEXT PRIMARY KEY,
+        password_hash TEXT NOT NULL
+      )
+    `;
+    await sql`
       INSERT INTO ruangsoal_data (id, payload)
       VALUES (1, ${sql.json(initialData)})
       ON CONFLICT (id) DO NOTHING
@@ -60,6 +66,37 @@ function ensureSchema(sql: Sql) {
     throw cause;
   });
   return globalThis.ruangSoalSchemaPromise;
+}
+
+export async function getAccountPasswordHash(accountId: string) {
+  const sql = getDatabase();
+  await ensureSchema(sql);
+  const [row] = await sql<{ password_hash: string }[]>`
+    SELECT password_hash FROM ruangsoal_passwords WHERE account_id = ${accountId}
+  `;
+  return row?.password_hash ?? null;
+}
+
+export async function createAccountPasswordHashIfMissing(accountId: string, passwordHash: string) {
+  const sql = getDatabase();
+  await ensureSchema(sql);
+  await sql`
+    INSERT INTO ruangsoal_passwords (account_id, password_hash)
+    VALUES (${accountId}, ${passwordHash})
+    ON CONFLICT (account_id) DO NOTHING
+  `;
+  return getAccountPasswordHash(accountId);
+}
+
+export async function setAccountPasswordHash(accountId: string, passwordHash: string) {
+  const sql = getDatabase();
+  await ensureSchema(sql);
+  await sql`
+    INSERT INTO ruangsoal_passwords (account_id, password_hash)
+    VALUES (${accountId}, ${passwordHash})
+    ON CONFLICT (account_id)
+    DO UPDATE SET password_hash = EXCLUDED.password_hash
+  `;
 }
 
 export async function getStoredData(): Promise<StoredDataVersion> {

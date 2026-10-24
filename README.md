@@ -45,7 +45,7 @@ Untuk proyek baru di Vercel, gunakan integrasi PostgreSQL melalui Vercel Marketp
 
    Terapkan variabel aplikasi ke **Production** dan **Preview**. Pastikan setiap environment memiliki `DATABASE_URL` yang benar. Hindari memakai URL database lokal `localhost` di Vercel.
 5. Jalankan deployment. Periksa `https://<domain-vercel-anda>/api/health`; hasil yang diharapkan adalah `{"ok":true,"database":"connected"}`. Jika gagal, periksa **Deployments → Functions/Logs** dan pastikan `DATABASE_URL` benar.
-6. Masuk menggunakan username admin dan kata sandi yang Anda set. Seed akun guru awal (`nadia`, `raka`, `dewi`) memakai `RUANGSOAL_TEACHER_PASSWORD`.
+6. Masuk menggunakan username admin dan kata sandi awal yang Anda set. Seed akun guru awal (`nadia`, `raka`, `dewi`) memakai `RUANGSOAL_TEACHER_PASSWORD` saat pertama kali masuk.
 
 Buat secret dengan:
 
@@ -69,7 +69,7 @@ Jangan commit `.env.local`. Login demo `admin` / `admin12345` dan kata sandi gur
 
 - `/api/health` mengembalikan `503`: pastikan integrasi PostgreSQL tersambung ke project dan environment Production serta `DATABASE_URL` tersedia.
 - Login menampilkan pesan server belum siap: pastikan `AUTH_SECRET` dan ketiga variabel `RUANGSOAL_*` terisi di environment yang sama. Buat deployment baru setelah mengubah variabel.
-- Login menampilkan username/kata sandi tidak sesuai: periksa ejaan/case username admin dan role yang dipilih. Untuk guru awal, gunakan username `nadia`, `raka`, atau `dewi` dengan kata sandi guru yang dikonfigurasi.
+- Login menampilkan username/password tidak sesuai: periksa ejaan/case username admin dan role yang dipilih. Untuk guru awal, gunakan username `nadia`, `raka`, atau `dewi` dengan password guru awal dari konfigurasi server. Jika password akun sudah pernah diubah di aplikasi, gunakan password baru tersebut; nilai environment hanya dipakai untuk bootstrap pertama.
 - Preview berfungsi tetapi Production tidak: pastikan semua variable di atas juga tersedia untuk **Production**; Preview dan Production bisa memakai database berbeda.
 
 ```bash
@@ -107,11 +107,13 @@ npm run build
 - Admin dapat mengunduh `.xlsx` dengan kolom `No`, `Soal`, `Jawaban A`, `Jawaban B`, `Jawaban C`, `Jawaban D`, `Jawaban Benar`, `Mata Pelajaran`, dan `Tingkat`.
 - Data soal dan akun guru disimpan di PostgreSQL, sehingga dapat diakses dari browser berbeda yang terhubung ke aplikasi/database yang sama.
 - Sesi login memakai cookie HTTP-only; `AUTH_SECRET` harus sama pada seluruh instance aplikasi.
+- Password awal dari environment di-hash dengan scrypt dan disimpan per akun di PostgreSQL saat login pertama. Setelah itu, perubahan password disimpan di database dan tidak perlu memperbarui environment variable.
+- Halaman Keamanan akun memungkinkan admin/guru mengubah password sendiri; admin juga dapat mereset password guru dari halaman Pengguna.
 - Endpoint pemeriksaan koneksi database: `/api/health`.
 - Saat admin login pertama kali di browser lama, data `localStorage` yang tersisa akan digabungkan ke database satu kali.
 
 ## Batasan
 
-Guru masih memakai satu kata sandi bersama yang ditentukan oleh `RUANGSOAL_TEACHER_PASSWORD`; gunakan sistem akun dengan kata sandi per pengguna sebelum aplikasi digunakan untuk data sensitif. Jika data berubah di browser lain setelah halaman dibuka, aplikasi menolak penyimpanan yang berpotensi menimpa data terbaru; muat ulang halaman untuk mengambil perubahan terkini.
+Password guru awal menggunakan satu nilai bersama dari `RUANGSOAL_TEACHER_PASSWORD`, tetapi setelah login pertama password disimpan per akun. Password baru minimal 12 karakter. Jika data berubah di browser lain setelah halaman dibuka, aplikasi menolak penyimpanan yang berpotensi menimpa data terbaru; muat ulang halaman untuk mengambil perubahan terkini.
 
 TinyMCE berjalan dalam mode GPL. Tinjau persyaratan lisensi TinyMCE sebelum mendistribusikan atau mengubah model lisensi aplikasi.

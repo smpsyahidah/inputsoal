@@ -1,29 +1,86 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+import {
+  createAccountPasswordHashIfMissing,
+  getAccountPasswordHash,
+  setAccountPasswordHash,
+} from "@/lib/database";
 import type { DemoSession } from "@/lib/ruangsoal";
 
 const COOKIE_NAME = "ruangsoal-session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
+const PASSWORD_KEY_LENGTH = 64;
+const scryptAsync = promisify(scrypt);
 
 export type LoginCredentials = {
   adminUsername: string;
-  adminPassword: string;
-  teacherPassword: string;
+  adminPassword: string | null;
+  teacherPassword: string | null;
 };
 
 export function getLoginCredentials(): LoginCredentials {
   const isProduction = process.env.NODE_ENV === "production";
   const adminUsername = process.env.RUANGSOAL_ADMIN_USERNAME ?? (isProduction ? "" : "admin");
-  const adminPassword = process.env.RUANGSOAL_ADMIN_PASSWORD ?? (isProduction ? "" : "admin12345");
-  const teacherPassword = process.env.RUANGSOAL_TEACHER_PASSWORD ?? (isProduction ? "" : "guru12345");
+  const adminPassword = process.env.RUANGSOAL_ADMIN_PASSWORD ?? (isProduction ? null : "admin12345");
+  const teacherPassword = process.env.RUANGSOAL_TEACHER_PASSWORD ?? (isProduction ? null : "guru12345");
 
-  if (!adminUsername.trim() || adminPassword.length < (isProduction ? 12 : 8) ||
-      teacherPassword.length < (isProduction ? 12 : 8)) {
-    throw new Error(
-      "RUANGSOAL_ADMIN_USERNAME, RUANGSOAL_ADMIN_PASSWORD, dan RUANGSOAL_TEACHER_PASSWORD harus diatur; kata sandi minimal 12 karakter di production.",
-    );
+  if (!adminUsername.trim()) {
+    throw new Error("RUANGSOAL_ADMIN_USERNAME harus diatur di environment server.");
   }
 
   return { adminUsername: adminUsername.trim(), adminPassword, teacherPassword };
+}
+
+function passwordAccountId(session: DemoSession) {
+  return session.role === "admin" ? "admin" : `teacher:${session.teacherId}`;
+}
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16);
+  const key = await scryptAsync(password, salt, PASSWORD_KEY_LENGTH) as Buffer;
+  return `scrypt$${salt.toString("base64url")}$${key.toString("base64url")}`;
+}
+
+async function matchesPassword(password: string, encodedHash: string) {
+  const [algorithm, saltValue, hashValue] = encodedHash.split("$");
+  if (algorithm !== "scrypt" || !saltValue || !hashValue) return false;
+
+  const salt = Buffer.from(saltValue, "base64url");
+  const expected = Buffer.from(hashValue, "base64url");
+  if (!salt.length || expected.length !== PASSWORD_KEY_LENGTH) return false;
+
+  const actual = await scryptAsync(password, salt, PASSWORD_KEY_LENGTH) as Buffer;
+  return timingSafeEqual(expected, actual);
+}
+
+export async function verifyAccountPassword(
+  accountId: string,
+  password: string,
+  initialPassword: string | null,
+) {
+  let encodedHash = await getAccountPasswordHash(accountId);
+  if (!encodedHash) {
+    if (!initialPassword) {
+      throw new Error("Password awal belum diatur. Isi variabel password di Vercel untuk bootstrap akun.");
+    }
+    if (password !== initialPassword) return false;
+    const minimumLength = process.env.NODE_ENV === "production" ? 12 : 8;
+    if (initialPassword.length < minimumLength) {
+      throw new Error(`Password awal harus terdiri dari minimal ${minimumLength} karakter.`);
+    }
+    encodedHash = await createAccountPasswordHashIfMissing(accountId, await hashPassword(initialPassword));
+  }
+
+  if (!encodedHash) throw new Error("Password akun gagal disiapkan.");
+  return matchesPassword(password, encodedHash);
+}
+
+export async function updateAccountPassword(accountId: string, password: string) {
+  await setAccountPasswordHash(accountId, await hashPassword(password));
+}
+
+export function getPasswordAccountId(session: DemoSession) {
+  return passwordAccountId(session);
 }
 
 function getSecret() {

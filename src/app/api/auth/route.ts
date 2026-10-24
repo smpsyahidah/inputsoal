@@ -3,6 +3,7 @@ import {
   createSessionCookie,
   getLoginCredentials,
   getSession,
+  verifyAccountPassword,
 } from "@/lib/auth";
 import { getStoredData } from "@/lib/database";
 
@@ -41,17 +42,23 @@ export async function POST(request: Request) {
     let session = null;
     if (body.role === "admin") {
       if (username === credentials.adminUsername.toLowerCase() &&
-          body.password === credentials.adminPassword) {
+          await verifyAccountPassword("admin", body.password, credentials.adminPassword)) {
         session = { role: "admin" as const };
       }
-    } else if (body.password === credentials.teacherPassword) {
+    } else {
       const { teachers } = (await getStoredData()).data;
       const teacher = teachers.find((item) => item.username.toLowerCase() === username);
-      if (teacher) session = { role: "guru" as const, teacherId: teacher.id };
+      if (teacher && await verifyAccountPassword(
+        `teacher:${teacher.id}`,
+        body.password,
+        credentials.teacherPassword,
+      )) {
+        session = { role: "guru" as const, teacherId: teacher.id };
+      }
     }
 
     if (!session) {
-      return Response.json({ error: "Username atau kata sandi tidak sesuai dengan akun demo." }, { status: 401 });
+      return Response.json({ error: "Username atau password tidak sesuai." }, { status: 401 });
     }
 
     return new Response(JSON.stringify({ session }), {

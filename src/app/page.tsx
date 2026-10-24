@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   FileText,
   GraduationCap,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Plus,
@@ -135,7 +136,7 @@ export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"questions" | "users">("questions");
+  const [activeView, setActiveView] = useState<"questions" | "users" | "security">("questions");
   const [filterSubject, setFilterSubject] = useState("Semua mapel");
   const [filterGrade, setFilterGrade] = useState("Semua tingkat");
   const [search, setSearch] = useState("");
@@ -145,6 +146,19 @@ export default function Home() {
   const [assignmentEditorTeacherId, setAssignmentEditorTeacherId] = useState<string | null>(null);
   const [existingAssignmentDraft, setExistingAssignmentDraft] = useState({ subject: "", grade: DEFAULT_GRADE as GradeLevel });
   const [teacherFormError, setTeacherFormError] = useState("");
+  const [teacherPasswordEditorId, setTeacherPasswordEditorId] = useState<string | null>(null);
+  const [teacherPasswordDraft, setTeacherPasswordDraft] = useState("");
+  const [teacherPasswordConfirm, setTeacherPasswordConfirm] = useState("");
+  const [teacherPasswordError, setTeacherPasswordError] = useState("");
+  const [teacherPasswordMessage, setTeacherPasswordMessage] = useState("");
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saveStatus, setSaveStatus] = useState<"saving" | "saved" | "error">("saved");
@@ -428,6 +442,61 @@ export default function Home() {
       .finally(() => router.replace("/login"));
   }
 
+  async function changeOwnPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordError("");
+    setPasswordMessage("");
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("Konfirmasi password baru tidak sama.");
+      return;
+    }
+
+    setPasswordBusy(true);
+    try {
+      const response = await fetch("/api/account/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Password gagal diubah.");
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordMessage("Password berhasil diubah. Gunakan password baru saat login berikutnya.");
+    } catch (cause) {
+      setPasswordError(cause instanceof Error ? cause.message : "Password gagal diubah.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
+  async function resetTeacherPassword(event: React.FormEvent<HTMLFormElement>, teacherId: string) {
+    event.preventDefault();
+    setTeacherPasswordError("");
+    setTeacherPasswordMessage("");
+    if (teacherPasswordDraft !== teacherPasswordConfirm) {
+      setTeacherPasswordError("Konfirmasi password baru tidak sama.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/account/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacherId, newPassword: teacherPasswordDraft }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Password guru gagal direset.");
+      setTeacherPasswordDraft("");
+      setTeacherPasswordConfirm("");
+      setTeacherPasswordMessage("Password guru berhasil direset.");
+    } catch (cause) {
+      setTeacherPasswordError(cause instanceof Error ? cause.message : "Password guru gagal direset.");
+    }
+  }
+
   function removeTeacher(id: string) {
     setTeachers((current) => current.filter((teacher) => teacher.id !== id));
     if (activeTeacherId === id) logout();
@@ -465,6 +534,9 @@ export default function Home() {
               <Users size={17} /> <span>Pengguna</span><span className="nav-count">{teachers.length}</span>
             </button>
           )}
+          <button className={`nav-item ${activeView === "security" ? "selected" : ""}`} onClick={() => setActiveView("security")}>
+            <KeyRound size={17} /> <span>Keamanan akun</span>
+          </button>
         </nav>
 
         <div className="sidebar-bottom">
@@ -480,7 +552,7 @@ export default function Home() {
       <section className="workspace" id="dashboard">
         {saveError && <div className="login-error" role="alert">Perubahan belum tersimpan: {saveError} <button onClick={() => window.location.reload()}>Muat ulang</button></div>}
         <header className="topbar">
-          <div className="breadcrumbs"><span>Ruang kerja</span><span className="crumb-divider">/</span><strong>{activeView === "users" ? "Pengguna" : "Bank soal"}</strong></div>
+          <div className="breadcrumbs"><span>Ruang kerja</span><span className="crumb-divider">/</span><strong>{activeView === "users" ? "Pengguna" : activeView === "security" ? "Keamanan akun" : "Bank soal"}</strong></div>
           <div className="topbar-actions">
             <span className="role-badge">{role === "admin" ? "Administrator" : "Guru"}</span>
             {role === "guru" && activeTeacher && (
@@ -493,7 +565,24 @@ export default function Home() {
           </div>
         </header>
 
-        {activeView === "users" && role === "admin" ? (
+        {activeView === "security" ? (
+          <div className="content users-content">
+            <div className="page-heading">
+              <div><div className="eyebrow"><ShieldCheck size={14} /> KEAMANAN</div><h1>Keamanan akun</h1><p>Ubah password akun Anda. Password baru tersimpan aman di database aplikasi.</p></div>
+            </div>
+            <section className="panel security-panel">
+              <form className="security-form" onSubmit={changeOwnPassword}>
+                <h2>Ganti password saya</h2>
+                <label>Password saat ini<input required type="password" autoComplete="current-password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} /></label>
+                <label>Password baru<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={passwordForm.newPassword} onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} /><span>Minimal 12 karakter.</span></label>
+                <label>Ulangi password baru<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })} /></label>
+                {passwordError && <div className="login-error" role="alert">{passwordError}</div>}
+                {passwordMessage && <div className="password-success" role="status">{passwordMessage}</div>}
+                <button className="button button-primary" type="submit" disabled={passwordBusy}>{passwordBusy ? "Menyimpan..." : "Simpan password baru"}</button>
+              </form>
+            </section>
+          </div>
+        ) : activeView === "users" && role === "admin" ? (
           <div className="content users-content">
             <div className="page-heading">
               <div><div className="eyebrow"><ShieldCheck size={14} /> ADMINISTRASI</div><h1>Pengguna</h1><p>Kelola akun guru dan mata pelajaran yang mereka ampu.</p></div>
@@ -507,8 +596,19 @@ export default function Home() {
                     <div className="teacher-info"><strong>{teacher.name}</strong><span>@{teacher.username}</span></div>
                     <div className="teacher-assignments">{teacher.assignments.map((assignment) => <span className="subject-pill" key={getAssignmentKey(assignment)}>{assignment.subject} · Tingkat {assignment.grade}</span>)}</div>
                     <button className="icon-button manage-assignments" aria-label={`Atur pengampu ${teacher.name}`} title="Atur mapel dan tingkat" onClick={() => { setAssignmentEditorTeacherId(assignmentEditorTeacherId === teacher.id ? null : teacher.id); setExistingAssignmentDraft({ subject: "", grade: DEFAULT_GRADE }); }}><Settings2 size={16} /></button>
+                    <button className="icon-button manage-assignments" aria-label={`Reset password ${teacher.name}`} title="Reset password guru" onClick={() => { setTeacherPasswordEditorId(teacherPasswordEditorId === teacher.id ? null : teacher.id); setTeacherPasswordDraft(""); setTeacherPasswordConfirm(""); setTeacherPasswordError(""); setTeacherPasswordMessage(""); }}><KeyRound size={16} /></button>
                     <button className="icon-button remove-button" aria-label={`Hapus ${teacher.name}`} title="Hapus guru" onClick={() => removeTeacher(teacher.id)}><Trash2 size={16} /></button>
                   </div>
+                  {teacherPasswordEditorId === teacher.id && <form className="teacher-password-editor" onSubmit={(event) => resetTeacherPassword(event, teacher.id)}>
+                    <h3>Reset password {teacher.name}</h3>
+                    <div className="password-reset-fields">
+                      <label>Password baru<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={teacherPasswordDraft} onChange={(event) => setTeacherPasswordDraft(event.target.value)} /></label>
+                      <label>Ulangi password<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={teacherPasswordConfirm} onChange={(event) => setTeacherPasswordConfirm(event.target.value)} /></label>
+                      <button className="button button-secondary" type="submit">Simpan password</button>
+                    </div>
+                    {teacherPasswordError && <div className="login-error" role="alert">{teacherPasswordError}</div>}
+                    {teacherPasswordMessage && <div className="password-success" role="status">{teacherPasswordMessage}</div>}
+                  </form>}
                   {assignmentEditorTeacherId === teacher.id && <div className="teacher-assignment-editor">
                     <div className="assignment-entry">
                       <label>Mata pelajaran<input list="subject-options" value={existingAssignmentDraft.subject} onChange={(event) => setExistingAssignmentDraft({ ...existingAssignmentDraft, subject: event.target.value })} placeholder="Contoh: IPA" /></label>
@@ -534,7 +634,7 @@ export default function Home() {
                     <datalist id="subject-options">{assignmentSubjects.map((subject) => <option key={subject} value={subject} />)}</datalist>
                   </div>
                   <div className="assignment-chips">{newTeacher.assignments.map((assignment, index) => <span className="assignment-chip" key={`${getAssignmentKey(assignment)}-${index}`}>{assignment.subject} · Tingkat {assignment.grade}<button type="button" onClick={() => setNewTeacher((current) => ({ ...current, assignments: current.assignments.filter((_, assignmentIndex) => assignmentIndex !== index) }))} aria-label={`Hapus penugasan ${assignment.subject} tingkat ${assignment.grade}`}><X size={13} /></button></span>)}</div>
-                  <p className="teacher-password-note">Kata sandi awal akun guru baru: <strong>guru12345</strong></p>
+                  <p className="teacher-password-note">Password awal guru baru mengikuti konfigurasi server. Admin dapat mereset password melalui tombol kunci pada daftar guru.</p>
                 </div>
                 {teacherFormError && <div className="login-error" role="alert">{teacherFormError}</div>}
                 <button className="button button-primary" type="submit" disabled={newTeacher.assignments.length === 0}><Plus size={16} /> Tambahkan guru</button>

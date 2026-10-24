@@ -191,6 +191,15 @@ h1, h2, h3, p { margin-top: 0; }
 .assignment-chip button:disabled { cursor: not-allowed; opacity: .35; }
 .teacher-password-note { margin: 11px 0 0; color: #888f84; font-size: 9px; }
 .teacher-password-note strong { color: #556454; font-weight: 650; }
+.security-panel { padding: 22px; }
+.security-form { display: grid; max-width: 470px; gap: 14px; }
+.security-form h2, .teacher-password-editor h3 { margin: 0; font-family: Georgia, serif; font-size: 18px; font-weight: 500; }
+.security-form label, .teacher-password-editor label { display: grid; gap: 7px; color: #50574e; font-size: 10px; font-weight: 650; }
+.security-form input, .teacher-password-editor input { width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid #dfe4dc; border-radius: 4px; background: white; color: #30372f; font-size: 11px; }
+.security-form label span { color: #858c82; font-size: 9px; font-weight: 400; }
+.password-success { padding: 9px 10px; border: 1px solid #c8ddc8; border-radius: 4px; background: #f0f7ef; color: #3d6845; font-size: 10px; }
+.teacher-password-editor { display: grid; gap: 12px; padding: 15px 18px; border-top: 1px solid var(--line); background: #fbfcfa; }
+.password-reset-fields { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 10px; }
 .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(24 34 27 / 42%); backdrop-filter: blur(2px); }
 .question-modal { display: flex; width: min(760px, 100%); max-height: min(92vh, 940px); flex-direction: column; overflow: hidden; border: 1px solid #e4e8df; border-radius: 8px; background: #fff; box-shadow: 0 22px 70px #17251e30; animation: modal-arrive 160ms ease-out; }
 @keyframes modal-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -370,6 +379,7 @@ h1, h2, h3, p { margin-top: 0; }
   .login-panel { min-height: 100vh; padding: 30px 22px; }
   .login-panel-inner { width: min(390px, 100%); }
   .login-mobile-brand { display: flex; }
+  .password-reset-fields { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 420px) {
